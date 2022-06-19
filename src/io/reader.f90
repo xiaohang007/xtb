@@ -26,6 +26,7 @@ module xtb_io_reader
    use xtb_io_reader_turbomole, only : readMoleculeCoord, readHessianTurbomole
    use xtb_io_reader_vasp, only : readMoleculeVasp
    use xtb_io_reader_xyz, only : readMoleculeXYZ
+   use xtb_io_reader_top, only : readMoleculeTopo
    use xtb_mctc_accuracy, only : wp
    use xtb_mctc_filetypes, only : fileType
    use xtb_type_environment, only : TEnvironment
@@ -79,6 +80,8 @@ subroutine readMolecule(env, mol, unit, ftype)
       call readMoleculeGenFormat(mol, unit, status, iomsg=message)
    case(fileType%gaussian)
       call readMoleculeGaussianExternal(mol, unit, status, iomsg=message)
+   case(fileType%top)
+      call readMoleculeTopo(mol, unit, status, iomsg=message)
    case default
       status = .false.
       message = "coordinate format not known"

@@ -61,6 +61,8 @@ module xtb_mctc_filetypes
 
       !> Orca Hessian format
       integer :: orca = 9
+
+      integer :: top = 10
    
     end type TFileTypeEnum
 
@@ -133,6 +135,8 @@ function getFileTypeFromMetaInfo(basename, extension) result(ftype)
          ftype = fileType%gen
       case('ein')
          ftype = fileType%gaussian
+      case('top')
+         ftype = fileType%top
       end select
    end if
 
@@ -217,6 +221,8 @@ subroutine generateFileName(fname, basename, extension, ftype)
          fname = fname//'.gen'
       case(fileType%gaussian)
          fname = fname//'.ein'
+      case(fileType%top)
+         fname = fname//'.top'
       end select
    endif
 end subroutine generateFileName

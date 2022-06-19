@@ -99,7 +99,7 @@ subroutine gfnff_ini(env,pr,makeneighbor,mol,gen,param,topo,accuracy)
       real(sp),allocatable:: rabd(:,:)
 
       character(len=255) atmp
-      integer  :: ich, err
+      integer  :: ich, err,xy
       real(wp) :: dispthr, cnthr, repthr, hbthr1, hbthr2
       logical :: exitRun
 
@@ -171,55 +171,19 @@ subroutine gfnff_ini(env,pr,makeneighbor,mol,gen,param,topo,accuracy)
       write(env%unit,'(10x," ------------------------------------------------- ")')
       write(env%unit,*)
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! distances and bonds
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      topo%xyze0 = mol%xyz ! initial geom
 
-      write(env%unit,'(10x,"distances ...")')
-      pbo   = 0
-      rab   = 0
-      sqrab = 0
-      do i=1,mol%n
-         ati=mol%at(i)
-         kk=i*(i-1)/2
-         do j=1,i-1
-            atj=mol%at(j)
-            k=kk+j
-            sqrab(k)=(mol%xyz(1,i)-mol%xyz(1,j))**2+(mol%xyz(2,i)-mol%xyz(2,j))**2+(mol%xyz(3,i)-mol%xyz(3,j))**2
-            rab(k)  =sqrt(sqrab(k))
-            if(rab(k).lt.1.d-3) then
-               write(env%unit,*) i,j,ati,atj,rab(k)
-               call env%error("Particular close distance present", source)
-               exit
-            endif
-         enddo
-      enddo
-
-      call env%check(exitRun)
-      if (exitRun) then
-         return
-      end if
 
 !     Calculate CN and derivative
-      allocate(dcn(3,mol%n,mol%n), source = 0.0d0 )
-      call gfnff_dlogcoord(mol%n,mol%at,mol%xyz,rab,cn,dcn,cnthr,param) ! dcn needed
       do i=1,mol%n
-         dum2=0
-         do j=1,mol%n
-            dum2=dum2+sqrt(dcn(1,j,i)**2+dcn(2,j,i)**2+dcn(3,j,i)**2)
-         enddo
-         mchar(i) = exp(-0.005d0*param%en(mol%at(i))**8)*dum2/(cn(i)+1.0d0)     ! estimated metallic character as ratio of av. dCN and CN
-                                                                      ! and an EN cut-off function, used in neigbor routinen and for BS estimate
+         cn(i)=dble(param%normcn(mol%at(i)))
       enddo
-      deallocate(dcn)
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! neighbor list, hyb and ring info
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
       topo%qa = 0
       qloop_count = 0
+      nbf(:, :) = mol%nbf(:, :)
 
 !111   continue
 !  do the loop only if factor is significant
@@ -227,15 +191,19 @@ subroutine gfnff_ini(env,pr,makeneighbor,mol,gen,param,topo,accuracy)
 
       write(env%unit,'(10x,"----------------------------------------")')
       write(env%unit,'(10x,"generating topology and atomic info file ...")')
-      call gfnff_neigh(env,makeneighbor,mol%n,mol%at,mol%xyz,rab,gen%rqshrink, &
-         & gen%rthr,gen%rthr2,gen%linthr,mchar,topo%hyb,itag,nbm,nbf,param,topo)
+      call gfnff_neigh(env,makeneighbor,mol%n,mol%at,gen%rqshrink, &
+         & gen%rthr,gen%rthr2,gen%linthr,topo%hyb,itag,nbm,nbf,param,topo)
 
       do i=1,mol%n
          imetal(i)=param%metal(mol%at(i))
          if(topo%nb(20,i).le.4.and.param%group(mol%at(i)).gt.3) imetal(i)=0 ! Sn,Pb,Bi, with small CN are better described as non-metals
       enddo
 
-
+      write(env%unit,'(''!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!toponb success'')')
+        do xy = 1, size(topo%nb, dim=1)
+         write(env%unit,"(*(g0,1X))") topo%nb(xy,:) ! 一次打印一行
+       end do
+      write(env%unit,*) topo%hyb
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! bonds (non bonded directly in EG)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -955,15 +923,7 @@ subroutine gfnff_ini(env,pr,makeneighbor,mol,gen,param,topo,accuracy)
 ! and output
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-      do i=1,mol%n
-         if(topo%hyb(i).eq.2 .and. piadr(i).eq.0 .and. topo%nb(20,i).eq.3 .and. param%group(mol%at(i)).eq.4)then ! C,Si,Ge... CN=3, no pi
-            jj=topo%nb(1,i)
-            kk=topo%nb(2,i)
-            ll=topo%nb(3,i)
-            phi=omega(mol%n,mol%xyz,i,jj,kk,ll)  ! the shitty second geom. dep. term GEODEP
-            if(abs(phi)*180./pi.gt.40.d0) topo%hyb(i) = 3  ! change to sp^3
-         endif
-      enddo
+
 
 !     if(pr)then
       write(env%unit,*)
@@ -1005,7 +965,7 @@ subroutine gfnff_ini(env,pr,makeneighbor,mol,gen,param,topo,accuracy)
       call gfnffrab(mol%n,mol%at,cn,rtmp)           ! guess RAB for output
 
       topo%nbond_vbond = topo%nbond
-      allocate( topo%vbond(3,topo%nbond), source = 0.0d0 )
+      allocate( topo%vbond(6,topo%nbond), source = 0.0d0 )
 
       write(env%unit,*)
       write(env%unit,'(10x,"#atoms :",3x,i0)') mol%n
@@ -1218,6 +1178,9 @@ subroutine gfnff_ini(env,pr,makeneighbor,mol,gen,param,topo,accuracy)
 
 ! output
          r0 = (rtmp(ij)+topo%vbond(1,i))*0.529167
+         topo%vbond(4,i) = rtmp(ij)+topo%vbond(1,i)
+         topo%vbond(5,i) = sqrt(param%repa(ia)*param%repa(ja))
+         topo%vbond(6,i) = param%repz(ia)*param%repz(ja)*param%repscalb
          if(pr) write(env%unit,'(2a3,2i5,2x,2i5,2x,6f8.3)') &
      &   mol%sym(ii),mol%sym(jj),ii,jj,bbtyp,rings,0.529167*rab(ij),r0,pibo(i),fqq,topo%vbond(3,i),topo%vbond(2,i)
       enddo
@@ -1254,20 +1217,6 @@ subroutine gfnff_ini(env,pr,makeneighbor,mol,gen,param,topo,accuracy)
 !     scale FC if bond is part of hydrogen bridge
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-      !Set up fix hblist just like for the HB term
-      call bond_hbset0(mol%n,mol%at,mol%xyz,sqrab,bond_hbn,topo,hbthr1,hbthr2)
-      allocate(bond_hbl(3,bond_hbn))
-      allocate(topo%nr_hb(topo%nbond), source=0)
-      call bond_hbset(mol%n,mol%at,mol%xyz,sqrab,bond_hbn,bond_hbl,topo,hbthr1,hbthr2)
-
-      !Set up AH, B and nr. of B list
-      call bond_hb_AHB_set0(mol%n,mol%at,topo%nbond,bond_hbn,bond_hbl,AHB_nr,topo)
-      allocate( lin_AHB(0:AHB_nr), source=0  )
-      call bond_hb_AHB_set1(mol%n,mol%at,topo%nbond,bond_hbn,bond_hbl,AHB_nr,lin_AHB,topo%bond_hb_nr,topo%b_max,topo)
-      allocate( topo%bond_hb_AH(2,topo%bond_hb_nr), source = 0 )
-      allocate( topo%bond_hb_B(topo%b_max,topo%bond_hb_nr), source = 0 )
-      allocate( topo%bond_hb_Bn(topo%bond_hb_nr), source = 0 )
-      call bond_hb_AHB_set(mol%n,mol%at,topo%nbond,bond_hbn,bond_hbl,AHB_nr,lin_AHB,topo)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !

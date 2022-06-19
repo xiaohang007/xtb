@@ -21,7 +21,7 @@ module xtb_gfnff_ini2
    use xtb_type_environment, only : TEnvironment
    implicit none
    private
-   public :: gfnff_neigh, getnb, nbondmat
+   public :: gfnff_neigh, nbondmat
    public :: pairsbond, pilist, nofs, xatom, ctype, amide, amideH, alphaCO
    public :: ringsatom, ringsbond, ringsbend, ringstors, ringstorl
    public :: chktors, chkrng, hbonds, getring36, ssort, goedeckera, qheavy
@@ -30,7 +30,7 @@ module xtb_gfnff_ini2
 
 contains
 
-subroutine gfnff_neigh(env,makeneighbor,natoms,at,xyz,rab,fq,f_in,f2_in,lintr,mchar,hyb,itag,nbm,nbf,param,topo)
+subroutine gfnff_neigh(env,makeneighbor,natoms,at,fq,f_in,f2_in,lintr,hyb,itag,nbm,nbf,param,topo)
       use xtb_gfnff_param
       implicit none
       character(len=*), parameter :: source = 'gfnff_ini2_neigh'
@@ -43,9 +43,6 @@ subroutine gfnff_neigh(env,makeneighbor,natoms,at,xyz,rab,fq,f_in,f2_in,lintr,mc
       integer itag(natoms)
       integer nbm(20,natoms)                 ! needed for ring assignment (done without metals)
       integer nbf(20,natoms)                 ! full needed for fragment assignment
-      real*8  rab   (natoms*(natoms+1)/2)
-      real*8  xyz(3,natoms)
-      real*8  mchar(natoms)
       real*8  fq
       real*8  f_in,f2_in               ! radius scaling for atoms/metal atoms recpectively
       real*8  lintr                    ! threshold for linearity
@@ -53,11 +50,12 @@ subroutine gfnff_neigh(env,makeneighbor,natoms,at,xyz,rab,fq,f_in,f2_in,lintr,mc
       logical etacoord,da,strange_iat,metal_iat
       integer,allocatable :: nbdum(:,:)
       real*8 ,allocatable :: cn(:),rtmp(:)
-      integer iat,i,j,k,ni,ii,jj,kk,ll,lin,ati,nb20i,nbdiff,hc_crit,nbmdiff,nnf,nni,nh,nm
+      integer iat,i,j,k,ni,ii,jj,kk,ll,lin,ati,nb20i,nbdiff,hc_crit,nbmdiff,nnf,nni,nh,nm,xy
       integer ai,aj,nn,im,ncm,l,no
       real*8 r,pi,a1,f,f1,phi,f2,rco,fat(86)
       data pi/3.1415926535897932384626433832795029d0/
       data fat   / 86 * 1.0d0 /
+      logical :: exist
 
 !     special hacks
       fat( 1)=1.02
@@ -87,34 +85,23 @@ subroutine gfnff_neigh(env,makeneighbor,natoms,at,xyz,rab,fq,f_in,f2_in,lintr,mc
 
 ! determine the neighbor list
       if(makeneighbor) then
+         topo%nb = nbf
+         nbm = nbf
 
-        topo%nb =0  ! without highly coordinates atoms
-        nbm=0  ! without any metal
-        nbf=0  ! full
+        write(env%unit,'(''!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!nbf'')')
+        do xy = 1, size(nbf, dim=1)
+         write(env%unit,"(*(g0,1X))") nbf(xy,:) ! 一次打印一行
+        end do
+      
+      write(env%unit,'(''!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!topo%nb'')')
+        do xy = 1, size(topo%nb, dim=1)
+         write(env%unit,"(*(g0,1X))") topo%nb(xy,:) ! 一次打印一行
+       end do
+        write(env%unit,'(''!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!nbm'')')
+        do xy = 1, size(nbm, dim=1)
+         write(env%unit,"(*(g0,1X))") nbm(xy,:) ! 一次打印一行
+        end do
 
-        do i=1,natoms
-           cn(i)=dble(param%normcn(at(i)))
-        enddo
-        call gfnffrab(natoms,at,cn,rtmp) ! guess RAB based on "normal" CN
-        do i=1,natoms
-           ai=at(i)
-           f1=fq
-           if(param%metal(ai) > 0) f1 = f1 * 2.0d0
-           do j=1,i-1
-              f2=fq
-              aj=at(j)
-              if(param%metal(aj) > 0) f2 = f2 * 2.0d0
-              k=lin(j,i)
-              rco=rtmp(k)
-              rtmp(k)=rtmp(k)-topo%qa(i)*f1-topo%qa(j)*f2 ! change radius of atom i and j with charge
-!             element specials
-              rtmp(k)=rtmp(k)*fat(ai)*fat(aj)
-           enddo
-        enddo
-
-        call getnb(natoms,at,rtmp,rab,mchar,1,f_in,f2_in,nbdum,nbf,param) ! full
-        call getnb(natoms,at,rtmp,rab,mchar,2,f_in,f2_in,nbf  ,topo%nb,param) ! no highly coordinates atoms
-        call getnb(natoms,at,rtmp,rab,mchar,3,f_in,f2_in,nbf  ,nbm,param) ! no metals and unusually coordinated stuff
 
 ! take the input
       else
@@ -226,19 +213,11 @@ subroutine gfnff_neigh(env,makeneighbor,natoms,at,xyz,rab,fq,f_in,f2_in,lintr,mc
             if(nb20i.ge.4)                               hyb(i)=3
             if(nb20i.gt.4.and.ati.gt.10.and.nbdiff.eq.0) hyb(i)=5
             if(nb20i.eq.3)                               hyb(i)=2
-            if(nb20i.eq.2) then
-              call bangl(xyz,nbdum(1,i),i,nbdum(2,i),phi)
-              if(phi*180./pi.lt.150.0)then                         ! geometry dep. setup! GEODEP
-                                                         hyb(i)=2  ! otherwise, carbenes will not be recognized
-                                                        itag(i)=1  ! tag for Hueckel and HB routines
-              else
-                                                         hyb(i)=1  ! linear triple bond etc
-              endif
-              if(topo%qa(i).lt.-0.4)                          then
+            if(nb20i.eq.2)                               hyb(i)=1  ! linear triple bond etc
+            if(topo%qa(i).lt.-0.4)                          then
                                                          hyb(i)=2
                                                         itag(i)=0  ! tag for Hueckel and HB routines
               endif
-            endif
             if(nb20i.eq.1)                               hyb(i)=1  ! CO
          endif
 ! N
@@ -266,7 +245,6 @@ subroutine gfnff_neigh(env,makeneighbor,natoms,at,xyz,rab,fq,f_in,f2_in,lintr,mc
             endif
             if(nb20i.eq.2) then
                                                          hyb(i)=2
-               call bangl(xyz,nbdum(1,i),i,nbdum(2,i),phi)
                jj=nbdum(1,i)
                kk=nbdum(2,i)
                if(nbdum(20,jj).eq.1.and.at(jj).eq.6)     hyb(i)=1  ! R-N=C
@@ -277,7 +255,6 @@ subroutine gfnff_neigh(env,makeneighbor,natoms,at,xyz,rab,fq,f_in,f2_in,lintr,mc
                if(nbdum(2,i).gt.0.and.param%metal(at(nbdum(2,i))).gt.0) hyb(i)=1 ! M-NC-R in e.g. nitriles
                if(at(jj).eq.7.and.at(kk).eq.7.and. &
      &          nbdum(20,jj).le.2.and.nbdum(20,kk).le.2) hyb(i)=1  ! N=N=N
-               if(phi*180./pi.gt.lintr)                 hyb(i)=1  ! geometry dep. setup! GEODEP
             endif
             if(nb20i.eq.1)                               hyb(i)=1
          endif
@@ -286,11 +263,6 @@ subroutine gfnff_neigh(env,makeneighbor,natoms,at,xyz,rab,fq,f_in,f2_in,lintr,mc
             if(nb20i.ge.3)                               hyb(i)=3
             if(nb20i.gt.3.and.ati.gt.10.and.nbdiff.eq.0) hyb(i)=5
             if(nb20i.eq.2)                               hyb(i)=3
-            if(nb20i.eq.2.and.nbmdiff.gt.0) then
-               call nn_nearest_noM(i,natoms,at,topo%nb,rab,j,param) ! CN of closest non-M atom
-                                        if(j.eq.3)       hyb(i)=2 ! M-O-X konj
-                                        if(j.eq.4)       hyb(i)=3 ! M-O-X non
-            endif
             if(nb20i.eq.1)                               hyb(i)=2
             if(nb20i.eq.1.and.nbdiff.eq.0) then
             if(topo%nb(20,topo%nb(1,i)).eq.1)                      hyb(i)=1 ! CO
@@ -344,65 +316,7 @@ subroutine gfnff_neigh(env,makeneighbor,natoms,at,xyz,rab,fq,f_in,f2_in,lintr,mc
 ! fill neighbor list
 !ccccccccccccccccccccccccccccccccccccccccccccccccc
 
-      subroutine getnb(n,at,rad,r,mchar,icase,f,f2,nbf,nb,param)
-      implicit none
-      type(TGFFData), intent(in) :: param
-      integer n,at(n),nbf(20,n),nb(20,n)
-      real*8 rad(n*(n+1)/2),r(n*(n+1)/2),mchar(n),f,f2
 
-      integer i,j,k,nn,icase,hc_crit,nnfi,nnfj,lin
-      integer tag(n*(n+1)/2)
-      real*8 rco,fm
-
-      nb  = 0 ! resulting array (nbf is full from first call)
-      tag = 0
-      do i=1,n
-         nnfi=nbf(20,i)                  ! full CN of i, only valid for icase > 1
-         do j=1,i-1
-            nnfj=nbf(20,j)               ! full CN of i
-            fm=1.0d0
-!           full case
-            if(icase.eq.1)then
-               if(param%metal(at(i)).eq.2) fm=fm*f2 !change radius for metal atoms
-               if(param%metal(at(j)).eq.2) fm=fm*f2
-               if(param%metal(at(i)).eq.1) fm=fm*(f2+0.025)
-               if(param%metal(at(j)).eq.1) fm=fm*(f2+0.025)
-            endif
-!           no HC atoms
-            if(icase.eq.2)then
-               hc_crit = 6
-               if(param%group(at(i)).le.2) hc_crit = 4
-               if(nnfi.gt.hc_crit) cycle
-               hc_crit = 6
-               if(param%group(at(j)).le.2) hc_crit = 4
-               if(nnfj.gt.hc_crit) cycle
-            endif
-!           no metals and unusually coordinated stuff
-            if(icase.eq.3)then
-               if(mchar(i).gt.0.25 .or. param%metal(at(i)).gt.0) cycle   ! metal case TMonly ?? TODO
-               if(mchar(j).gt.0.25 .or. param%metal(at(j)).gt.0) cycle   ! metal case
-               if(nnfi.gt.param%normcn(at(i)).and.at(i).gt.10)   cycle   ! HC case
-               if(nnfj.gt.param%normcn(at(j)).and.at(j).gt.10)   cycle   ! HC case
-            endif
-            k=lin(j,i)
-            rco=rad(k) !(rad(i)+rad(j))/0.5291670d0
-!               R         est. R0
-            if(r(k).lt. fm * f * rco) tag(k)=1
-         enddo
-      enddo
-
-      do i=1,n
-         nn = 0
-         do j=1,n
-            if(tag(lin(j,i)).eq.1.and.i.ne.j) then
-               nn=nn+1
-               nb(nn,i)=j
-            endif
-         enddo
-         nb(20,i) = nn
-      enddo
-
-      end subroutine getnb 
 
 !ccccccccccccccccccccccccccccccccccccccccccccccccc
 ! find the CN of nearest non metal of atom i

@@ -42,7 +42,7 @@ module xtb_type_molecule
    use xtb_type_vendordata
    implicit none
 
-   public :: TMolecule, new_molecule_api, init
+   public :: TMolecule, new_molecule_api, init, init2
    public :: len, size
 
    private
@@ -50,7 +50,7 @@ module xtb_type_molecule
 
    !> Molecular structure information
    type :: TMolecule
-
+      integer,allocatable ::     nbf(:,:)   ! neighbors nb(20,i) is the # neigbors
       !> Number of atoms
       integer  :: n = 0
 
@@ -178,6 +178,11 @@ module xtb_type_molecule
       module procedure :: initMoleculeNumbers
    end interface
 
+   interface init2
+      module procedure :: initMolecule2
+      module procedure :: initMoleculeSymbols2
+      module procedure :: initMoleculeNumbers2
+   end interface
 
    interface TMolecule
       module procedure :: new_molecule_api
@@ -318,6 +323,97 @@ subroutine initMoleculeSymbols &
 
 end subroutine initMoleculeSymbols
 
+!> Constructor for the molecular structure type
+subroutine initMolecule2 &
+     & (mol, at, sym, nbf, chrg, uhf, lattice, pbc)
+   type(TMolecule), intent(out) :: mol
+   integer, intent(in) :: at(:)
+   character(len=*), intent(in) :: sym(:)
+   integer,allocatable, intent(in) ::     nbf(:,:)
+   real(wp), intent(in), optional :: chrg
+   integer, intent(in), optional :: uhf
+   real(wp), intent(in), optional :: lattice(3, 3)
+   logical, intent(in), optional :: pbc(3)
+
+   integer, allocatable :: id(:)
+   character(len=symbolLength), allocatable :: sTmp(:)
+   integer :: nAt, nId, iAt, iId,xy
+
+   nAt = min(size(at, dim=1), size(sym, dim=1))
+
+   call mol%allocate(nAt)
+
+
+
+   call getIdentity(mol%nId, mol%id, sym)
+   mol%at(:) = at(:nAt)
+   mol%sym(:) = sym(:nAt)
+   mol%nbf(:, :) = nbf(:, :nAt)
+
+   if (present(chrg)) then
+      mol%chrg = chrg
+   else
+      mol%chrg = 0
+   end if
+   if (present(uhf)) then
+      mol%uhf = uhf
+   else
+      mol%uhf = 0
+   end if
+
+   call mol%set_nuclear_charge
+   call mol%set_atomic_masses
+
+
+
+end subroutine initMolecule2
+
+
+!> Constructor for the molecular structure type
+subroutine initMoleculeNumbers2 &
+      & (mol, at, nbf, chrg, uhf, lattice, pbc)
+   type(TMolecule), intent(out) :: mol
+   integer, intent(in) :: at(:)
+   integer,allocatable, intent(in) ::     nbf(:,:)
+   real(wp), intent(in), optional :: chrg
+   integer, intent(in), optional :: uhf
+   real(wp), intent(in), optional :: lattice(3, 3)
+   logical, intent(in), optional :: pbc(3)
+
+   character(len=4), allocatable :: sym(:)
+   integer :: nAt
+
+   nAt = size(at, dim=1)
+   allocate(sym(nAt))
+   sym(:) = toSymbol(at(:nAt))
+
+   call init2(mol, at, sym, nbf, chrg, uhf, lattice, pbc)
+
+end subroutine initMoleculeNumbers2
+
+
+!> Constructor for the molecular structure type
+subroutine initMoleculeSymbols2 &
+      & (mol, sym, nbf, chrg, uhf, lattice, pbc)
+   type(TMolecule), intent(out) :: mol
+   character(len=*), intent(in) :: sym(:)
+   integer,allocatable, intent(in) ::     nbf(:,:)
+   real(wp), intent(in), optional :: chrg
+   integer, intent(in), optional :: uhf
+   real(wp), intent(in), optional :: lattice(3, 3)
+   logical, intent(in), optional :: pbc(3)
+   integer xy
+
+   integer, allocatable :: at(:)
+   integer :: nAt
+
+   nAt = size(sym, dim=1)
+   allocate(at(nAt))
+   at(:) = toNumber(sym(:nAt))
+   call init2(mol, at, sym, nbf, chrg, uhf, lattice, pbc)
+
+end subroutine initMoleculeSymbols2
+
 
 !> Constructor for the molecular structure type, compatible with C input
 type(TMolecule) function new_molecule_api &
@@ -414,6 +510,7 @@ subroutine allocate_molecule(self,n)
    allocate( self%xyz(3,n),       source = 0.0_wp )
    allocate( self%abc(3,n),       source = 0.0_wp )
    allocate( self%dist(n,n),      source = 0.0_wp )
+   allocate( self%nbf(20,n),      source = 0 )
    allocate( self%atmass(n),      source = 0.0_wp )
    allocate( self%z(n),           source = 0.0_wp )
    allocate( self%cn(n),          source = 0.0_wp )
@@ -435,6 +532,7 @@ subroutine deallocate_molecule(self)
    if (allocated(self%xyz))    deallocate(self%xyz)
    if (allocated(self%abc))    deallocate(self%abc)
    if (allocated(self%dist))   deallocate(self%dist)
+   if (allocated(self%nbf))    deallocate(self%nbf)   
    if (allocated(self%atmass)) deallocate(self%atmass)
    if (allocated(self%z))      deallocate(self%z)
    if (allocated(self%cn))     deallocate(self%cn)

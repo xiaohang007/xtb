@@ -24,4 +24,5 @@ srcs += files(
   'turbomole.f90',
   'vasp.f90',
   'xyz.f90',
+  'top.f90',
 )
