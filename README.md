@@ -5,7 +5,7 @@
 [![DOI](https://img.shields.io/badge/DOI-10.1002%2Fwcms.1493-blue)](https://doi.org/10.1002/wcms.1493)
 [![Github Downloads All Releases](https://img.shields.io/github/downloads/grimme-lab/xtb/total)](https://github.com/grimme-lab/xtb/releases)
 
-This is the forked repository of the `xtb` program package developed by the Grimme group in Bonn.
+This is a forked repository of the `xtb` program package developed by the Grimme group in Bonn.
 The GFNFF and IO parts of the xtb program is modified to read *.top file (neighbor list with atom types) and to output bond/angle parameters.
 
 <div align="center">
