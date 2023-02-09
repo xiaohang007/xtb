@@ -73,9 +73,6 @@ subroutine setup_summary(iunit,n,fname,xcontrol,wfx,xrc)
    integer,intent(in) :: n
    real(wp) :: dum5
    character(len=:),allocatable :: cdum
-   write(iunit,'(a)')
-   call generic_header(iunit,'Calculation Setup',49,10)
-   write(iunit,'(a)')
    if (allocated(cdum)) deallocate(cdum)
    call get_command(length=l)
    allocate( character(len=l) :: cdum )

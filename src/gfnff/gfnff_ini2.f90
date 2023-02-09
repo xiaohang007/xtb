@@ -88,19 +88,19 @@ subroutine gfnff_neigh(env,makeneighbor,natoms,at,fq,f_in,f2_in,lintr,hyb,itag,n
          topo%nb = nbf
          nbm = nbf
 
-        write(env%unit,'(''!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!nbf'')')
-        do xy = 1, size(nbf, dim=1)
-         write(env%unit,"(*(g0,1X))") nbf(xy,:) ! 一次打印一行
-        end do
-      
-      write(env%unit,'(''!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!topo%nb'')')
-        do xy = 1, size(topo%nb, dim=1)
-         write(env%unit,"(*(g0,1X))") topo%nb(xy,:) ! 一次打印一行
-       end do
-        write(env%unit,'(''!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!nbm'')')
-        do xy = 1, size(nbm, dim=1)
-         write(env%unit,"(*(g0,1X))") nbm(xy,:) ! 一次打印一行
-        end do
+!        write(env%unit,'(''!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!nbf'')')
+!        do xy = 1, size(nbf, dim=1)
+!         write(env%unit,"(*(g0,1X))") nbf(xy,:) 
+!        end do
+!      
+!      write(env%unit,'(''!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!topo%nb'')')
+!        do xy = 1, size(topo%nb, dim=1)
+!         write(env%unit,"(*(g0,1X))") topo%nb(xy,:)
+!       end do
+!        write(env%unit,'(''!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!nbm'')')
+!        do xy = 1, size(nbm, dim=1)
+!         write(env%unit,"(*(g0,1X))") nbm(xy,:) 
+!        end do
 
 
 ! take the input
@@ -306,9 +306,7 @@ subroutine gfnff_neigh(env,makeneighbor,natoms,at,fq,f_in,f2_in,lintr,hyb,itag,n
             endif
          enddo
       enddo
-      if(dble(j)/dble(natoms).gt.0.3) then
-         call env%error(' too many atoms with extreme high CN', source)
-      end if
+
 
       end subroutine gfnff_neigh
 
@@ -1147,15 +1145,6 @@ subroutine getring36(n,at,nbin,a0_in,cout,irout)
                      do i6=1,n5
                         a6=nb(i6,a5)
                         n6=nb(20,a6)
-                        if(a6.eq.a5) cycle
-                        c(6)=a6
-                        if(a6.eq.a0.and.chkrng(n,6,c))then
-                         iring=6
-                         if(kk.eq.maxr) goto 99
-                         kk=kk+1
-                         cdum(1:iring,kk)=c(1:iring)
-                         idum(kk)=iring
-                        endif
                      enddo
                   enddo
                enddo

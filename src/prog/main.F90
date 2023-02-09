@@ -305,13 +305,7 @@ subroutine xtbMain(env, argParser)
    !> no user interaction up to now, time to show off!
    !> print the xtb banner with version number and compilation date
    !> making a fancy version of this is hard, x is difficult in ASCII art
-   call xtb_header(env%unit)
-   !> make sure you cannot blame us for destroying your computer
-   call disclamer(env%unit)
-   !> how to cite this program
-   call citation(env%unit)
    !> print current time
-   call prdate('S')
 
 
    ! ------------------------------------------------------------------------
@@ -375,8 +369,6 @@ subroutine xtbMain(env, argParser)
    mol%chrg = real(set%ichrg, wp)
    mol%uhf = set%nalphabeta
    call initrand
-
-   call setup_summary(env%unit,mol%n,fname,xcontrol,chk%wfn,xrc)
 
 
 
@@ -443,7 +435,6 @@ subroutine xtbMain(env, argParser)
       iprop = env%unit
    endif
 
-   call generic_header(iprop,'Property Printout',49,10)
 
 
    if(printTopo%any()) then
@@ -457,17 +448,7 @@ subroutine xtbMain(env, argParser)
 
    ! ------------------------------------------------------------------------
    !  make some post processing afterward, show some timings and stuff
-   write(env%unit,'(a)')
-   write(env%unit,'(72("-"))')
-   call stop_timing_run
-   call stop_timing(1)
-   call prdate('E')
-   write(env%unit,'(72("-"))')
-   call prtiming(1,'total')
-   call prtiming(2,'SCF')
 
-
-   write(env%unit,'(a)')
    call terminate(0)
 
 
