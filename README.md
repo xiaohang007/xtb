@@ -5,9 +5,9 @@
 [![DOI](https://img.shields.io/badge/DOI-10.1002%2Fwcms.1493-blue)](https://doi.org/10.1002/wcms.1493)
 [![Github Downloads All Releases](https://img.shields.io/github/downloads/grimme-lab/xtb/total)](https://github.com/grimme-lab/xtb/releases)
 
-This is a forked repository of the `xtb` program package developed by the Grimme group in Bonn.
-The GFNFF and IO parts of the xtb program is modified to read *.top file (neighbor list with atom types) and to output bond/angle parameters.
+### This is a forked repository of the `xtb` program package developed by the Grimme group in Bonn. The GFNFF and IO parts of the xtb program is modified to read *.top file (neighbor list with atom types) and to output bond/angle parameters. A pre-compiled binary is provided as ./pre-compiled_binary/xtb_noring_nooutput_nostdout_noCN.
 
+### Specifically, we built a new module, xtb_io_reader_top, to accept neighbor lists as input and store the neighbor list in topo%nb. And we modified xtb_gfnff_ini, xtb_gfnff_ini2, xtb_gfnff_rab, xtb_gfnff_setup to initialize newGFFCalculator with topo%nb (without relying on Cartesian coordinates of atoms (mol%xyz)). Additionally, instead of calculating the coordination number of atoms (cn(i)) with Cartesian coordinates of atoms, cn(i) is set to the normal coordination number of that atom type (param%normcn(mol%at(i))).
 <div align="center">
 <img src="./assets/logo/xtb.svg" alt="Extended Tight Binding" width="220">
 </div>
